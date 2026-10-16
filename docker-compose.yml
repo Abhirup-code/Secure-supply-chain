@@ -1,0 +1,15 @@
+services:
+  web:
+    build: .
+    ports:
+      - "8000:8000"
+    read_only: true            # container filesystem is read-only
+    tmpfs: [/tmp]
+    volumes:
+      - links-data:/data       # the only writable path
+    cap_drop: [ALL]            # drop all Linux capabilities
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+volumes:
+  links-data:
