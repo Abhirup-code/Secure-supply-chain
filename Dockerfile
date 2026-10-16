@@ -1,12 +1,16 @@
 # ---- build stage: install pinned dependencies into a virtualenv ----
-FROM python:3.11-slim AS build
+FROM python:3.14-slim AS build
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1 PIP_NO_CACHE_DIR=1
 RUN python -m venv /venv
 COPY requirements.txt .
-RUN /venv/bin/pip install -r requirements.txt
+RUN /venv/bin/pip install -r requirements.txt \
+    && /venv/bin/pip uninstall -y pip   # no package manager left in the app venv
 
 # ---- runtime stage: only the app and its venv, no build tools ----
-FROM python:3.11-slim
+FROM python:3.14-slim
+# Apply the latest OS security patches and remove pip/setuptools, which the app never uses at runtime
+RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
+RUN python -m pip uninstall -y pip setuptools wheel || true
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PATH="/venv/bin:$PATH" DB_PATH=/data/links.db
 RUN useradd --create-home --shell /usr/sbin/nologin appuser \
     && mkdir /data && chown appuser:appuser /data
