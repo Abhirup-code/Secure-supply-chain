@@ -59,5 +59,12 @@ curl -X POST -H 'Content-Type: application/json' -d '{"url":"https://example.com
 1. Settings > Code security: enable Dependabot alerts, Secret scanning, Push protection, Private vulnerability reporting.
 2. Settings > Rules > Rulesets: protect `main` (require a pull request and passing CI, Security, and CodeQL checks).
 3. Settings > Actions > General: Workflow permissions = "Read repository contents".
+   
+## Test
+I tested my own pipeline by committing a fake AWS key. The secret scanner and the SAST lint both caught it, and the build stopped before an image was ever created.
 
-Built with AI assistance; I reviewed, ran, and verified the code and pipeline.
+<img width="1167" height="701" alt="Screenshot 2026-10-16 at 6 52 41 PM" src="https://github.com/user-attachments/assets/31d90ac7-ffb1-49e8-ba9d-291559d86b56" />
+
+<img width="1116" height="514" alt="Screenshot 2026-10-16 at 5 59 31 PM" src="https://github.com/user-attachments/assets/647f3d2b-720d-4231-8c34-6dda31e5fac0" />
+
+
