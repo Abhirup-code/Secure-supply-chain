@@ -1,12 +1,12 @@
 # ---- build stage: install pinned dependencies into a virtualenv ----
-FROM python:3.11-slim AS build
+FROM python:3.14-slim AS build
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1 PIP_NO_CACHE_DIR=1
 RUN python -m venv /venv
 COPY requirements.txt .
 RUN /venv/bin/pip install -r requirements.txt
 
 # ---- runtime stage: only the app and its venv, no build tools ----
-FROM python:3.11-slim
+FROM python:3.14-slim
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PATH="/venv/bin:$PATH" DB_PATH=/data/links.db
 RUN useradd --create-home --shell /usr/sbin/nologin appuser \
     && mkdir /data && chown appuser:appuser /data
