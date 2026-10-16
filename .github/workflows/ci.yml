@@ -49,10 +49,10 @@ jobs:
           persist-credentials: false
       - name: Build and smoke test
         run: |
-          docker build -t secure-ship:test .
+          docker build -t secure-supply-chain:test .
           docker run -d --name smoke -p 8000:8000 --read-only --tmpfs /tmp \
             --cap-drop ALL --security-opt no-new-privileges:true \
-            -v ship-data:/data secure-ship:test
+            -v ship-data:/data secure-supply-chain:test
           for i in $(seq 1 20); do curl -sf http://localhost:8000/health && break || sleep 1; done
           curl -sf http://localhost:8000/health
           code=$(curl -sf -X POST -H 'Content-Type: application/json' \
@@ -70,7 +70,7 @@ jobs:
       - name: Scan image (SARIF report)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
-          image-ref: secure-ship:test
+          image-ref: secure-supply-chain:test
           format: sarif
           output: trivy-image.sarif
           ignore-unfixed: true
@@ -84,7 +84,7 @@ jobs:
       - name: Fail on fixable CRITICAL or HIGH image vulnerabilities
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
-          image-ref: secure-ship:test
+          image-ref: secure-supply-chain:test
           severity: CRITICAL,HIGH
           ignore-unfixed: true
           exit-code: "1"

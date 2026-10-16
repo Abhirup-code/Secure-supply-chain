@@ -1,4 +1,4 @@
-# secure-ship
+# Secure-supply-chain
 
 A small link-shortener API delivered through a **hardened DevSecOps pipeline**: every change is linted, tested, scanned for secrets, vulnerable dependencies, code flaws, and container issues, then published as a **signed image with an SBOM and build provenance**.
 

@@ -1,4 +1,4 @@
-"""secure-ship: a small link shortener built to demonstrate a secure delivery pipeline.
+"""secure-supply-chain: a small link shortener built to demonstrate a secure delivery pipeline.
 
 Security choices in the app itself:
 - Only http and https URLs are accepted, which blocks javascript: and data: links

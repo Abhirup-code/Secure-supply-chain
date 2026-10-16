@@ -10,7 +10,7 @@ repository's Security tab (private vulnerability reporting).
 Every image on `main` is signed with Sigstore keyless signing. To verify one yourself:
 
 ```bash
-cosign verify ghcr.io/abhirup-code/secure-ship:latest \
-  --certificate-identity-regexp "^https://github.com/Abhirup-code/secure-ship/" \
+cosign verify ghcr.io/abhirup-code/secure-supply-chain:latest \
+  --certificate-identity-regexp "^https://github.com/Abhirup-code/Secure-supply-chain/" \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
