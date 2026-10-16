@@ -1,0 +1,15 @@
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 110
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "S"]   # S = flake8-bandit security rules
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101"]                 # assert is fine in tests
+
+[tool.bandit]
+exclude_dirs = ["tests"]
