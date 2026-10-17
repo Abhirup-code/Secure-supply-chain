@@ -36,7 +36,7 @@ See [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) for the STRIDE threat model and
 
 ```bash
 pip install -r requirements-dev.txt
-pytest --cov=app            # 15 tests, 96% coverage
+pytest --cov=app            # 17 tests
 ruff check . && bandit -c pyproject.toml -r app
 ```
 
@@ -52,6 +52,7 @@ curl -X POST -H 'Content-Type: application/json' -d '{"url":"https://example.com
 | POST | `/api/links` | Create a short link from `{"url": "https://..."}` |
 | GET | `/{code}` | Redirect to the original URL (302) and count the hit |
 | GET | `/api/links/{code}` | Link details and hit count |
+| DELETE | `/api/links/{code}` | Delete a short link (204, or 404 if unknown) |
 | GET | `/health` | Health check |
 
 ## Recommended repository settings

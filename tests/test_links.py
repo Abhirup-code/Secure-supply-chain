@@ -77,3 +77,14 @@ def test_security_headers_on_every_response(client):
         assert r.headers["X-Content-Type-Options"] == "nosniff"
         assert r.headers["X-Frame-Options"] == "DENY"
         assert "default-src 'none'" in r.headers["Content-Security-Policy"]
+
+
+def test_delete_link(client):
+    code = create(client, "https://example.com").get_json()["code"]
+    assert client.delete(f"/api/links/{code}").status_code == 204
+    assert client.get(f"/{code}").status_code == 404
+    assert client.get(f"/api/links/{code}").status_code == 404
+
+
+def test_delete_unknown_link_returns_404(client):
+    assert client.delete("/api/links/doesnotexist").status_code == 404
