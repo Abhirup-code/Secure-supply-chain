@@ -83,6 +83,15 @@ def create_app(db_path=None):
             return jsonify(error="not found"), 404
         return jsonify(dict(row))
 
+    @app.delete("/api/links/<code>")
+    def delete_link(code):
+        db = get_db()
+        cur = db.execute("DELETE FROM links WHERE code = ?", (code,))
+        db.commit()
+        if cur.rowcount == 0:
+            return jsonify(error="not found"), 404
+        return "", 204
+
     @app.get("/<code>")
     def follow(code):
         db = get_db()
