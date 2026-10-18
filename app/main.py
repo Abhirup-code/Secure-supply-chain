@@ -8,6 +8,7 @@ Security choices in the app itself:
 - Security headers are added to every response, and debug mode is never enabled.
 """
 
+import ipaddress
 import os
 import secrets
 import sqlite3
@@ -17,6 +18,31 @@ from flask import Flask, abort, g, jsonify, redirect, request
 
 MAX_URL_LENGTH = 2048
 ALLOWED_SCHEMES = {"http", "https"}
+BLOCKED_HOSTNAMES = {"localhost", "localhost.localdomain", "metadata.google.internal"}
+
+
+def is_internal_host(hostname):
+    """Return True if a link points at a loopback, private, link-local, or reserved address.
+
+    This stops short links being used to send people to internal systems or the cloud
+    metadata service (169.254.169.254). Hostnames are not resolved; only names and IP
+    literals are checked.
+    """
+    host = (hostname or "").strip(".").lower()
+    if host in BLOCKED_HOSTNAMES or host.endswith(".localhost"):
+        return True
+    try:
+        ip = ipaddress.ip_address(host)
+    except ValueError:
+        return False
+    return (
+        ip.is_private
+        or ip.is_loopback
+        or ip.is_link_local
+        or ip.is_reserved
+        or ip.is_multicast
+        or ip.is_unspecified
+    )
 
 
 def create_app(db_path=None):
@@ -65,6 +91,8 @@ def create_app(db_path=None):
         parsed = urlparse(url)
         if parsed.scheme.lower() not in ALLOWED_SCHEMES or not parsed.netloc:
             return jsonify(error="only http and https URLs are allowed"), 400
+        if is_internal_host(parsed.hostname):
+            return jsonify(error="links to internal or private addresses are not allowed"), 400
         db = get_db()
         for _ in range(5):
             code = secrets.token_urlsafe(6)

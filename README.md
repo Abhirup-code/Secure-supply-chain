@@ -28,7 +28,7 @@ Dependabot ──────── weekly updates for actions, pip, and the Doc
 | Code | ruff security rules, bandit, CodeQL security-extended |
 | Container | Multi-stage build, non-root user, read-only filesystem, all capabilities dropped, `no-new-privileges`, health check |
 | Image integrity | SBOM and SLSA provenance attached; image signed by digest with cosign and verified |
-| App | http/https allowlist (blocks `javascript:` links), parameterized SQL, unguessable codes, CSP and security headers |
+| App | http/https allowlist (blocks `javascript:` links), blocks internal and private addresses (localhost, 10.x, 192.168.x, cloud metadata), parameterized SQL, unguessable codes, CSP and security headers |
 
 See [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) for the STRIDE threat model and [SECURITY.md](SECURITY.md) for how to verify an image.
 
@@ -36,7 +36,7 @@ See [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) for the STRIDE threat model and
 
 ```bash
 pip install -r requirements-dev.txt
-pytest --cov=app            # 17 tests
+pytest --cov=app            # 29 tests
 ruff check . && bandit -c pyproject.toml -r app
 ```
 
