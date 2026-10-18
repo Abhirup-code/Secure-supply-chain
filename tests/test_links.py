@@ -88,3 +88,30 @@ def test_delete_link(client):
 
 def test_delete_unknown_link_returns_404(client):
     assert client.delete("/api/links/doesnotexist").status_code == 404
+
+
+@pytest.mark.parametrize(
+    "internal_url",
+    [
+        "http://localhost/admin",
+        "http://LOCALHOST:8080",
+        "http://app.localhost/",
+        "http://127.0.0.1/",
+        "http://10.0.0.5/",
+        "http://172.16.0.1/",
+        "http://192.168.1.1/router",
+        "http://169.254.169.254/latest/meta-data/",
+        "http://metadata.google.internal/",
+        "http://0.0.0.0/",
+        "http://[::1]/",
+    ],
+)
+def test_internal_and_private_addresses_rejected(client, internal_url):
+    r = create(client, internal_url)
+    assert r.status_code == 400
+    assert "internal" in r.get_json()["error"]
+
+
+def test_public_ip_and_domain_still_allowed(client):
+    assert create(client, "https://8.8.8.8/").status_code == 201
+    assert create(client, "https://example.com/path?q=1").status_code == 201

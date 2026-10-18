@@ -9,6 +9,7 @@ A short threat model for the app and its delivery pipeline. Each threat maps to 
 | Tampering | SQL injection through a short code | Parameterized queries only; test `test_sql_injection_attempt_is_harmless` |
 | Elevation / XSS | Storing a `javascript:` or `data:` link that runs in a victim's browser | Scheme allowlist (http, https); parametrized test of dangerous URLs |
 | Information disclosure | Guessing other users' short codes | Codes from `secrets.token_urlsafe`; uniqueness test |
+| Information disclosure / SSRF-style abuse | Short links pointing at internal hosts or the cloud metadata service | Block loopback, private, link-local, and reserved IPs plus `localhost`; parametrized tests |
 | Denial of service | Very large payloads | URL length limit (2,048 characters) |
 | Information disclosure | Clickjacking, MIME sniffing | CSP `frame-ancestors 'none'`, `X-Frame-Options`, `nosniff` headers |
 
