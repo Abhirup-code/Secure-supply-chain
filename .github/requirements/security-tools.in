@@ -1,0 +1,4 @@
+# Security tools used in CI. Regenerate after editing:
+#   uv pip compile .github/requirements/security-tools.in --universal --python-version 3.14 --generate-hashes -o .github/requirements/security-tools.txt
+pip-audit==2.10.1
+zizmor==1.31.1

@@ -1,5 +1,10 @@
 # Secure-supply-chain
 
+[![CI](https://github.com/Abhirup-code/Secure-supply-chain/actions/workflows/ci.yml/badge.svg)](https://github.com/Abhirup-code/Secure-supply-chain/actions/workflows/ci.yml)
+[![Security](https://github.com/Abhirup-code/Secure-supply-chain/actions/workflows/security.yml/badge.svg)](https://github.com/Abhirup-code/Secure-supply-chain/actions/workflows/security.yml)
+[![CodeQL](https://github.com/Abhirup-code/Secure-supply-chain/actions/workflows/codeql.yml/badge.svg)](https://github.com/Abhirup-code/Secure-supply-chain/actions/workflows/codeql.yml)
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/Abhirup-code/Secure-supply-chain/badge)](https://scorecard.dev/viewer/?uri=github.com/Abhirup-code/Secure-supply-chain)
+
 A small link-shortener API delivered through a **hardened DevSecOps pipeline**: every change is linted, tested, scanned for secrets, vulnerable dependencies, code flaws, and container issues, then published as a **signed image with an SBOM and build provenance**.
 
 The app is intentionally small. The point of the project is the pipeline and the security controls around it.
@@ -24,7 +29,7 @@ Dependabot ──────── weekly updates for actions, pip, and the Doc
 | Workflow token | Default `contents: read`; `packages: write` and `id-token: write` only in the publish job on `main` |
 | Third-party actions | Pinned to full commit SHAs; `persist-credentials: false` on every checkout |
 | Secrets | gitleaks on every push and PR; no long-lived keys (keyless signing via GitHub OIDC) |
-| Dependencies | All pinned; pip-audit, dependency review, Dependabot |
+| Dependencies | All pinned with SHA-256 hashes (`--require-hashes`) in CI and the image; pip-audit, dependency review, Dependabot |
 | Code | ruff security rules, bandit, CodeQL security-extended |
 | Container | Multi-stage build, non-root user, read-only filesystem, all capabilities dropped, `no-new-privileges`, health check |
 | Image integrity | SBOM and SLSA provenance attached; image signed by digest with cosign and verified |
@@ -35,7 +40,7 @@ See [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) for the STRIDE threat model and
 ## Run locally
 
 ```bash
-pip install -r requirements-dev.txt
+pip install --require-hashes -r requirements-dev.txt
 pytest --cov=app            # 33 tests
 ruff check . && bandit -c pyproject.toml -r app
 ```
@@ -54,6 +59,16 @@ curl -X POST -H 'Content-Type: application/json' -d '{"url":"https://example.com
 | GET | `/api/links/{code}` | Link details and hit count |
 | DELETE | `/api/links/{code}` | Delete a short link (204, or 404 if unknown) |
 | GET | `/health` | Health check |
+
+## Updating dependencies
+
+Dependencies are locked with hashes. Edit the `.in` file, then regenerate the lock file:
+
+```bash
+pip install uv
+uv pip compile requirements.in --universal --python-version 3.14 --generate-hashes -o requirements.txt
+uv pip compile requirements-dev.in --universal --python-version 3.14 --generate-hashes -o requirements-dev.txt
+```
 
 ## Recommended repository settings
 

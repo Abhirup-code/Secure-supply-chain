@@ -1,0 +1,6 @@
+# Every change needs review from the code owner.
+# Workflows, policies, and the Dockerfile control the supply chain, so they are listed explicitly.
+*                    @Abhirup-code
+/.github/            @Abhirup-code
+/k8s/                @Abhirup-code
+/Dockerfile          @Abhirup-code
