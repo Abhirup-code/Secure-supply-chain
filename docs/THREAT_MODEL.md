@@ -11,6 +11,7 @@ A short threat model for the app and its delivery pipeline. Each threat maps to 
 | Information disclosure | Guessing other users' short codes | Codes from `secrets.token_urlsafe`; uniqueness test |
 | Information disclosure / SSRF-style abuse | Short links pointing at internal hosts or the cloud metadata service | Block loopback, private, link-local, and reserved IPs plus `localhost`; parametrized tests |
 | Denial of service | Very large payloads | URL length limit (2,048 characters) |
+| Denial of service / spam | Flooding the API with link creation | Per-IP rate limit on `POST /api/links` (default 30/minute) returning 429 with `Retry-After` |
 | Information disclosure | Clickjacking, MIME sniffing | CSP `frame-ancestors 'none'`, `X-Frame-Options`, `nosniff` headers |
 
 ## Container
@@ -35,6 +36,7 @@ A short threat model for the app and its delivery pipeline. Each threat maps to 
 
 ## Residual risks (known, accepted for a demo project)
 
-- No authentication or rate limiting on link creation.
+- No authentication on link creation.
+- The rate limiter is in memory per worker; a shared store (for example Redis) would be needed across replicas.
 - SQLite is fine for a demo but not for multiple replicas.
 - The base image is pinned by tag, not digest; Dependabot keeps it current.

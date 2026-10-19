@@ -12,6 +12,8 @@ import ipaddress
 import os
 import secrets
 import sqlite3
+import threading
+import time
 from urllib.parse import urlparse
 
 from flask import Flask, abort, g, jsonify, redirect, request
@@ -45,9 +47,38 @@ def is_internal_host(hostname):
     )
 
 
-def create_app(db_path=None):
+class RateLimiter:
+    """Fixed-window rate limiter kept in memory, keyed by client IP.
+
+    Each gunicorn worker keeps its own counts, so the effective limit is per worker.
+    That is enough to stop simple abuse in a demo; a shared store such as Redis would
+    be used in production.
+    """
+
+    def __init__(self, limit, window_seconds=60):
+        self.limit = limit
+        self.window = window_seconds
+        self._hits = {}
+        self._lock = threading.Lock()
+
+    def check(self, key):
+        """Record a request and return (allowed, seconds_until_reset)."""
+        now = time.monotonic()
+        with self._lock:
+            start, count = self._hits.get(key, (now, 0))
+            if now - start >= self.window:
+                start, count = now, 0
+            count += 1
+            self._hits[key] = (start, count)
+            retry_after = max(1, int(self.window - (now - start)))
+            return count <= self.limit, retry_after
+
+
+def create_app(db_path=None, rate_limit=None):
     app = Flask(__name__)
     app.config["DB_PATH"] = db_path or os.environ.get("DB_PATH", "/data/links.db")
+    limit = rate_limit if rate_limit is not None else int(os.environ.get("RATE_LIMIT_PER_MINUTE", "30"))
+    limiter = RateLimiter(limit=limit)
 
     def get_db():
         if "db" not in g:
@@ -82,6 +113,12 @@ def create_app(db_path=None):
 
     @app.post("/api/links")
     def create_link():
+        allowed, retry_after = limiter.check(request.remote_addr or "unknown")
+        if not allowed:
+            resp = jsonify(error="rate limit exceeded, try again later")
+            resp.status_code = 429
+            resp.headers["Retry-After"] = str(retry_after)
+            return resp
         data = request.get_json(silent=True) or {}
         url = str(data.get("url", "")).strip()
         if not url:

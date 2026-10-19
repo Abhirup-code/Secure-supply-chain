@@ -1,6 +1,10 @@
 """Functional and security tests for the link shortener."""
 
+import time
+
 import pytest
+
+from app.main import RateLimiter
 
 
 def create(client, url):
@@ -115,3 +119,35 @@ def test_internal_and_private_addresses_rejected(client, internal_url):
 def test_public_ip_and_domain_still_allowed(client):
     assert create(client, "https://8.8.8.8/").status_code == 201
     assert create(client, "https://example.com/path?q=1").status_code == 201
+
+
+def test_rate_limit_blocks_after_limit(limited_client):
+    for _ in range(3):
+        assert create(limited_client, "https://example.com").status_code == 201
+    r = create(limited_client, "https://example.com")
+    assert r.status_code == 429
+    assert int(r.headers["Retry-After"]) >= 1
+    assert "rate limit" in r.get_json()["error"]
+
+
+def test_rate_limit_does_not_affect_reads(limited_client):
+    code = create(limited_client, "https://example.com").get_json()["code"]
+    for _ in range(3):
+        create(limited_client, "https://example.com")
+    assert limited_client.get(f"/{code}").status_code == 302
+    assert limited_client.get(f"/api/links/{code}").status_code == 200
+
+
+def test_rate_limit_window_resets():
+    limiter = RateLimiter(limit=1, window_seconds=0.05)
+    assert limiter.check("1.2.3.4")[0] is True
+    assert limiter.check("1.2.3.4")[0] is False
+    time.sleep(0.06)
+    assert limiter.check("1.2.3.4")[0] is True
+
+
+def test_rate_limit_is_per_client():
+    limiter = RateLimiter(limit=1)
+    assert limiter.check("1.1.1.1")[0] is True
+    assert limiter.check("2.2.2.2")[0] is True
+    assert limiter.check("1.1.1.1")[0] is False

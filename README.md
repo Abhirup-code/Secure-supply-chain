@@ -28,7 +28,7 @@ Dependabot ──────── weekly updates for actions, pip, and the Doc
 | Code | ruff security rules, bandit, CodeQL security-extended |
 | Container | Multi-stage build, non-root user, read-only filesystem, all capabilities dropped, `no-new-privileges`, health check |
 | Image integrity | SBOM and SLSA provenance attached; image signed by digest with cosign and verified |
-| App | http/https allowlist (blocks `javascript:` links), blocks internal and private addresses (localhost, 10.x, 192.168.x, cloud metadata), parameterized SQL, unguessable codes, CSP and security headers |
+| App | http/https allowlist (blocks `javascript:` links), blocks internal and private addresses (localhost, 10.x, 192.168.x, cloud metadata), parameterized SQL, unguessable codes, per-IP rate limiting (429 + `Retry-After`), CSP and security headers |
 
 See [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) for the STRIDE threat model and [SECURITY.md](SECURITY.md) for how to verify an image.
 
@@ -36,7 +36,7 @@ See [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) for the STRIDE threat model and
 
 ```bash
 pip install -r requirements-dev.txt
-pytest --cov=app            # 29 tests
+pytest --cov=app            # 33 tests
 ruff check . && bandit -c pyproject.toml -r app
 ```
 
@@ -49,7 +49,7 @@ curl -X POST -H 'Content-Type: application/json' -d '{"url":"https://example.com
 
 | Method | Path | Description |
 |---|---|---|
-| POST | `/api/links` | Create a short link from `{"url": "https://..."}` |
+| POST | `/api/links` | Create a short link from `{"url": "https://..."}` (rate limited, default 30/minute per IP via `RATE_LIMIT_PER_MINUTE`) |
 | GET | `/{code}` | Redirect to the original URL (302) and count the hit |
 | GET | `/api/links/{code}` | Link details and hit count |
 | DELETE | `/api/links/{code}` | Delete a short link (204, or 404 if unknown) |
