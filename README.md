@@ -83,4 +83,9 @@ I tested my own pipeline by committing a fake AWS key. The secret scanner and th
 
 <img width="1116" height="514" alt="Screenshot 2026-10-16 at 5 59 31 PM" src="https://github.com/user-attachments/assets/647f3d2b-720d-4231-8c34-6dda31e5fac0" />
 
+## Test 
+# with rules
+
+<img width="802" height="466" alt="Screenshot 2026-10-19 at 1 33 37 PM" src="https://github.com/user-attachments/assets/32b1b43e-3ec6-44be-8504-07fcef555d07" />
+
 
