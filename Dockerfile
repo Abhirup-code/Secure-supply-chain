@@ -3,7 +3,7 @@ FROM python:3.14-slim AS build
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1 PIP_NO_CACHE_DIR=1
 RUN python -m venv /venv
 COPY requirements.txt .
-RUN /venv/bin/pip install -r requirements.txt \
+RUN /venv/bin/pip install --require-hashes -r requirements.txt \
     && /venv/bin/pip uninstall -y pip   # no package manager left in the app venv
 
 # ---- runtime stage: only the app and its venv, no build tools ----
