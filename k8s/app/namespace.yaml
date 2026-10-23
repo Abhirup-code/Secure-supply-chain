@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: links
+  labels:
+    # Kubernetes' built-in Pod Security Admission also enforces the restricted profile,
+    # as a second layer behind the Kyverno policies in k8s/policies.
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest
