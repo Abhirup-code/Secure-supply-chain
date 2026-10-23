@@ -1,0 +1,15 @@
+# Grype settings for the SBOM vulnerability gate (CI, "image" job).
+#
+# The build fails on any HIGH or CRITICAL vulnerability that has a fix available.
+# Trivy scans the image itself; Grype scans the SBOM, so two independent scanners and
+# databases have to agree the image is clean.
+fail-on-severity: high
+only-fixed: true
+
+# Accepted risks. Each entry must name the vulnerability and package and give a reason,
+# so every exception is reviewed in a pull request and recorded in git history. Example:
+#   - vulnerability: CVE-2026-12345
+#     package:
+#       name: libexample
+#     reason: "Only reachable through the X feature, which this image does not use. Review by 2026-12-31."
+ignore: []
