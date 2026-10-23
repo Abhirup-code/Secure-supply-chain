@@ -1,0 +1,8 @@
+# kube-linter runs every built-in check except the ones below, each excluded on purpose.
+checks:
+  addAllBuiltIn: true
+  exclude:
+    - minimum-three-replicas    # demo stores data in SQLite, so it runs one replica
+    - no-node-affinity          # no special node requirements
+    - dnsconfig-options         # default cluster DNS settings are fine
+    - required-annotation-email # ownership is recorded with the `owner` label instead

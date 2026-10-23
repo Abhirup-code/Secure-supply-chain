@@ -1,0 +1,63 @@
+# Pods in the app namespace must be locked down: non-root, no privilege escalation,
+# every Linux capability dropped, seccomp on, read-only root filesystem, and CPU and
+# memory limits set. (The namespace also enforces the Kubernetes "restricted" Pod
+# Security Standard as a second, independent layer.)
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: require-hardened-pods
+  annotations:
+    policies.kyverno.io/title: Require hardened pods
+    policies.kyverno.io/category: Pod Security
+    policies.kyverno.io/severity: high
+spec:
+  validationActions: [Deny]
+  autogen:
+    podControllers:
+      controllers: [deployments, replicasets, statefulsets, daemonsets, jobs, cronjobs]
+  matchConstraints:
+    namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: links
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods]
+  variables:
+    - name: podSC
+      expression: object.spec.?securityContext.orValue({})
+    - name: containers
+      expression: object.spec.containers + object.spec.?initContainers.orValue([])
+  validations:
+    - expression: >-
+        variables.containers.all(c,
+          c.?securityContext.?runAsNonRoot.orValue(variables.podSC.?runAsNonRoot.orValue(false)) == true &&
+          c.?securityContext.?runAsUser.orValue(variables.podSC.?runAsUser.orValue(1)) != 0)
+      message: Containers must run as a non-root user (runAsNonRoot true, runAsUser not 0).
+    - expression: >-
+        variables.containers.all(c,
+          c.?securityContext.?privileged.orValue(false) == false &&
+          c.?securityContext.?allowPrivilegeEscalation.orValue(true) == false)
+      message: Containers must not be privileged and must set allowPrivilegeEscalation false.
+    - expression: >-
+        variables.containers.all(c,
+          'ALL' in c.?securityContext.?capabilities.?drop.orValue([]) &&
+          c.?securityContext.?capabilities.?add.orValue([]).size() == 0)
+      message: Containers must drop ALL capabilities and add none back.
+    - expression: >-
+        variables.containers.all(c,
+          c.?securityContext.?seccompProfile.?type.orValue(variables.podSC.?seccompProfile.?type.orValue(''))
+            in ['RuntimeDefault', 'Localhost'])
+      message: A seccomp profile (RuntimeDefault or Localhost) must be set.
+    - expression: >-
+        variables.containers.all(c, c.?securityContext.?readOnlyRootFilesystem.orValue(false) == true)
+      message: Containers must use a read-only root filesystem.
+    - expression: >-
+        variables.containers.all(c,
+          has(c.resources) && has(c.resources.limits) &&
+          'cpu' in c.resources.limits && 'memory' in c.resources.limits)
+      message: Containers must set CPU and memory limits.
+    - expression: >-
+        !object.spec.?hostNetwork.orValue(false) && !object.spec.?hostPID.orValue(false) && !object.spec.?hostIPC.orValue(false)
+      message: Pods must not share the host network, PID, or IPC namespaces.

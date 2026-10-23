@@ -1,0 +1,67 @@
+# Only images that this repository's publish workflow built and signed may run.
+#
+# For every image from ghcr.io/abhirup-code/secure-supply-chain, Kyverno checks at admission:
+#   1. a Sigstore signature from the publish workflow (keyless: a GitHub OIDC identity, no keys to leak)
+#   2. a signed SBOM attestation (SPDX)
+#   3. a signed SLSA build provenance attestation that names this repository
+# It also rewrites the image reference to the verified digest, so moving a tag later
+# cannot swap in different content.
+apiVersion: policies.kyverno.io/v1
+kind: ImageValidatingPolicy
+metadata:
+  name: require-signed-images
+  annotations:
+    policies.kyverno.io/title: Require signed images, SBOM, and provenance
+    policies.kyverno.io/category: Software Supply Chain Security
+    policies.kyverno.io/severity: high
+spec:
+  validationActions: [Deny]
+  webhookConfiguration:
+    timeoutSeconds: 30
+  autogen:
+    podControllers:
+      controllers: [deployments, replicasets, statefulsets, daemonsets, jobs, cronjobs]
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods]
+  matchImageReferences:
+    - glob: "ghcr.io/abhirup-code/secure-supply-chain*"
+  validationConfigurations:
+    mutateDigest: true
+    verifyDigest: true
+    required: true
+  attestors:
+    - name: pipeline
+      cosign:
+        keyless:
+          identities:
+            # Only the publish workflow, running from main or a release tag
+            - issuer: https://token.actions.githubusercontent.com
+              subjectRegExp: '^https://github\.com/Abhirup-code/Secure-supply-chain/\.github/workflows/publish\.yml@refs/(heads/main|tags/v[0-9]+\.[0-9]+\.[0-9]+)$'
+        ctlog:
+          url: https://rekor.sigstore.dev
+  attestations:
+    - name: sbom
+      intoto:
+        type: https://spdx.dev/Document
+    - name: provenance
+      intoto:
+        type: https://slsa.dev/provenance/v1
+  validations:
+    - expression: >-
+        images.containers.map(image, verifyImageSignatures(image, [attestors.pipeline])).all(e, e > 0)
+      message: Image is not signed by this repository's publish workflow.
+    - expression: >-
+        images.containers.map(image, verifyAttestationSignatures(image, attestations.sbom, [attestors.pipeline])).all(e, e > 0)
+      message: Image has no signed SBOM attestation.
+    - expression: >-
+        images.containers.map(image, verifyAttestationSignatures(image, attestations.provenance, [attestors.pipeline])).all(e, e > 0)
+      message: Image has no signed build provenance attestation.
+    - expression: >-
+        images.containers.map(image,
+          extractPayload(image, attestations.provenance).predicate.buildDefinition.externalParameters.workflow.repository
+            == 'https://github.com/Abhirup-code/Secure-supply-chain').all(e, e)
+      message: Build provenance does not name this repository.

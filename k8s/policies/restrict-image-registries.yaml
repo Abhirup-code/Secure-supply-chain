@@ -1,0 +1,33 @@
+# In the app namespace, every container must use this project's own image.
+# Anything else (a public image, a look-alike name, another registry) is rejected.
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: restrict-image-registries
+  annotations:
+    policies.kyverno.io/title: Allow only the project's own image
+    policies.kyverno.io/category: Software Supply Chain Security
+    policies.kyverno.io/severity: high
+spec:
+  validationActions: [Deny]
+  autogen:
+    podControllers:
+      controllers: [deployments, replicasets, statefulsets, daemonsets, jobs, cronjobs]
+  matchConstraints:
+    namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: links
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods]
+  variables:
+    - name: allContainers
+      expression: object.spec.containers + object.spec.?initContainers.orValue([]) + object.spec.?ephemeralContainers.orValue([])
+  validations:
+    - expression: >-
+        variables.allContainers.all(c,
+          c.image.startsWith('ghcr.io/abhirup-code/secure-supply-chain:') ||
+          c.image.startsWith('ghcr.io/abhirup-code/secure-supply-chain@'))
+      message: Images in the links namespace must come from ghcr.io/abhirup-code/secure-supply-chain.

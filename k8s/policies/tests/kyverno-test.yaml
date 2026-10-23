@@ -1,0 +1,47 @@
+# Offline tests for the pod and registry policies. Run with: kyverno test k8s/policies/tests
+# The signature policy needs a registry, so it is tested in a real cluster instead
+# (scripts/admission-test.sh).
+apiVersion: cli.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: pod-and-registry-policies
+policies:
+  - ../restrict-image-registries.yaml
+  - ../require-hardened-pods.yaml
+resources:
+  - ../../app/deployment.yaml
+  - bad-deployments.yaml
+variables: values.yaml
+results:
+  # The real deployment passes both policies
+  - isValidatingPolicy: true
+    policy: require-hardened-pods
+    kind: Deployment
+    resources: [links]
+    result: pass
+  - isValidatingPolicy: true
+    policy: restrict-image-registries
+    kind: Deployment
+    resources: [links]
+    result: pass
+  # Every bad deployment is rejected by the policy it breaks
+  - isValidatingPolicy: true
+    policy: require-hardened-pods
+    kind: Deployment
+    resources:
+      - bad-runs-as-root
+      - bad-privileged
+      - bad-adds-capability
+      - bad-unconfined-seccomp
+      - bad-writable-root-fs
+      - bad-no-limits
+      - bad-host-network
+    result: fail
+  - isValidatingPolicy: true
+    policy: restrict-image-registries
+    kind: Deployment
+    resources:
+      - bad-public-image
+      - bad-lookalike-image
+      - bad-init-container-image
+    result: fail

@@ -1,0 +1,15 @@
+{
+  "buildDefinition": {
+    "buildType": "https://actions.github.io/buildtypes/workflow/v1",
+    "externalParameters": {
+      "workflow": {
+        "ref": "refs/heads/main",
+        "repository": "https://github.com/Abhirup-code/Secure-supply-chain",
+        "path": ".github/workflows/publish.yml"
+      }
+    }
+  },
+  "runDetails": {
+    "builder": { "id": "https://github.com/actions/runner/github-hosted" }
+  }
+}

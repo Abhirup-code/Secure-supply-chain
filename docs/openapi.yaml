@@ -1,0 +1,91 @@
+openapi: 3.0.3
+info:
+  title: Secure-supply-chain link shortener
+  version: 1.0.0
+  description: >-
+    API for the demo link shortener. CI also uses this file to drive the OWASP ZAP API scan.
+servers:
+  - url: http://localhost:8000
+paths:
+  /health:
+    get:
+      summary: Health check
+      responses:
+        "200":
+          description: The service is up
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+  /api/links:
+    post:
+      summary: Create a short link
+      description: Rate limited per client IP (default 30 per minute).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url]
+              properties:
+                url:
+                  type: string
+                  format: uri
+                  maxLength: 2048
+                  example: https://example.com/page
+      responses:
+        "201":
+          description: Link created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Link" }
+        "400": { description: Missing, too long, non-http(s), or internal URL }
+        "429": { description: Rate limit exceeded (see the Retry-After header) }
+  /api/links/{code}:
+    parameters:
+      - $ref: "#/components/parameters/Code"
+    get:
+      summary: Link details and hit count
+      responses:
+        "200":
+          description: Link details
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LinkStats" }
+        "404": { description: Unknown code }
+    delete:
+      summary: Delete a short link
+      responses:
+        "204": { description: Deleted }
+        "404": { description: Unknown code }
+  /{code}:
+    parameters:
+      - $ref: "#/components/parameters/Code"
+    get:
+      summary: Follow a short link
+      responses:
+        "302": { description: Redirect to the stored URL }
+        "404": { description: Unknown code }
+components:
+  parameters:
+    Code:
+      name: code
+      in: path
+      required: true
+      schema: { type: string, example: abc123XY }
+  schemas:
+    Link:
+      type: object
+      properties:
+        code: { type: string }
+        url: { type: string }
+        short: { type: string }
+    LinkStats:
+      type: object
+      properties:
+        code: { type: string }
+        url: { type: string }
+        hits: { type: integer }
