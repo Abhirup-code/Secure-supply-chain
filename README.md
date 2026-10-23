@@ -4,7 +4,7 @@
 [![Security](https://github.com/Abhirup-code/Secure-supply-chain/actions/workflows/security.yml/badge.svg)](https://github.com/Abhirup-code/Secure-supply-chain/actions/workflows/security.yml)
 [![CodeQL](https://github.com/Abhirup-code/Secure-supply-chain/actions/workflows/codeql.yml/badge.svg)](https://github.com/Abhirup-code/Secure-supply-chain/actions/workflows/codeql.yml)
 [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/Abhirup-code/Secure-supply-chain/badge)](https://scorecard.dev/viewer/?uri=github.com/Abhirup-code/Secure-supply-chain)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
 A small link-shortener API delivered through a **hardened DevSecOps pipeline**. Every change is linted, tested, and scanned (code, secrets, dependencies, container, running app). Every published image is **signed, with a signed SBOM and build provenance**, and a **Kubernetes admission policy refuses to run anything the pipeline did not sign**. CI proves that last part in a real cluster on every pull request.
 
@@ -157,4 +157,4 @@ uv pip compile requirements-dev.in --universal --python-version 3.14 --generate-
 
 ## License
 
-[MIT](LICENSE)
+[Apache License 2.0](LICENSE). Copyright 2026 Abhirup Khan; see [NOTICE](NOTICE).
