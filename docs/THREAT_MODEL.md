@@ -55,7 +55,6 @@ A short threat model for the app and its delivery pipeline. Each threat maps to 
 - No authentication on link creation.
 - The rate limiter is in memory per worker; a shared store (for example Redis) would be needed across replicas.
 - SQLite is fine for a demo but not for multiple replicas.
-- The base image is pinned by tag, not digest; Dependabot keeps it current.
 - Policies cover images from this project only; a real cluster would extend the signature policy to every namespace and registry it runs.
 - In the CI cluster test, a temporary key stands in for the keyless GitHub identity (a pull request cannot obtain it). The production policy with the real identity is checked against each published image.
 - An SBOM or provenance attestation is itself a signature by the trusted identity, so either one satisfies the signature check; all three are still required.
