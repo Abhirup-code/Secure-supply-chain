@@ -5,3 +5,8 @@ docs
 *.md
 __pycache__
 .venv
+k8s
+scripts
+.zap
+.grype.yaml
+LICENSE
