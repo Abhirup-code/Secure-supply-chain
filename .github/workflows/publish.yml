@@ -121,13 +121,16 @@ jobs:
         run: |
           IMAGE_REF="${IMAGE}@${DIGEST}" yq '.spec.template.spec.containers[0].image = strenv(IMAGE_REF)' \
             k8s/app/deployment.yaml > deployment-under-test.yaml
-          kyverno apply k8s/policies/ --resource deployment-under-test.yaml --registry \
+          # List the policy files: given the folder, the CLI also reads the tests and loads nothing.
+          kyverno apply k8s/policies/require-signed-images.yaml \
+            k8s/policies/restrict-image-registries.yaml k8s/policies/require-hardened-pods.yaml \
+            --resource deployment-under-test.yaml --registry \
             > policy-result.txt 2>&1 || true
           cat policy-result.txt
           # The Kyverno CLI exits 0 even when a check fails, so read its summary line instead.
           grep -Eq 'fail: 0, warn: 0, error: 0' policy-result.txt || {
             echo "::error::the production policies would reject this image"; exit 1; }
-          grep -Eq 'pass: [1-9]' policy-result.txt || {
+          grep -Eq 'pass: 3,' policy-result.txt || {
             echo "::error::the policies did not evaluate this image"; exit 1; }
 
       - name: Upload SBOM
