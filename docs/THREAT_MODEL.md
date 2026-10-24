@@ -6,6 +6,7 @@ A short threat model for the app and its delivery pipeline. Each threat maps to 
 
 | Threat (STRIDE) | Example | Control |
 |---|---|---|
+| Spoofing / tampering | Anyone creating spam links or deleting other people's links | API key required for create and delete; only SHA-256 hashes are configured, so leaked config does not leak keys; constant-time comparison; failed attempts count toward the rate limit; no keys configured means writes are refused |
 | Tampering | SQL injection through a short code | Parameterized queries only; test `test_sql_injection_attempt_is_harmless` |
 | Elevation / XSS | Storing a `javascript:` or `data:` link that runs in a victim's browser | Scheme allowlist (http, https); parametrized test of dangerous URLs |
 | Information disclosure | Guessing other users' short codes | Codes from `secrets.token_urlsafe`; uniqueness test |
@@ -54,7 +55,7 @@ A short threat model for the app and its delivery pipeline. Each threat maps to 
 
 ## Residual risks (known, accepted for a demo project)
 
-- No authentication on link creation.
+- API keys are shared secrets with no expiry or per-key permissions; rotating one means updating the hash list.
 - The rate limiter is in memory per worker; a shared store (for example Redis) would be needed across replicas.
 - SQLite is fine for a demo but not for multiple replicas.
 - Policies cover images from this project only; a real cluster would extend the signature policy to every namespace and registry it runs.

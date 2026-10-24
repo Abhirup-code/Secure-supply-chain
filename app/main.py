@@ -6,10 +6,16 @@ Security choices in the app itself:
 - Short codes come from the `secrets` module, so they cannot be guessed.
 - All SQL uses parameterized queries (no string formatting), which prevents SQL injection.
 - Security headers are added to every response, and debug mode is never enabled.
+- Creating and deleting links needs an API key. Only SHA-256 hashes of the keys are
+  configured (API_KEY_HASHES or API_KEY_HASHES_FILE), keys are compared in constant time, and failed attempts
+  count toward the rate limit. With no keys configured, writes are refused (fail closed).
 """
 
+import hashlib
+import hmac
 import ipaddress
 import os
+import re
 import secrets
 import sqlite3
 import threading
@@ -21,6 +27,22 @@ from flask import Flask, abort, g, jsonify, redirect, request
 MAX_URL_LENGTH = 2048
 ALLOWED_SCHEMES = {"http", "https"}
 BLOCKED_HOSTNAMES = {"localhost", "localhost.localdomain", "metadata.google.internal"}
+MAX_API_KEY_LENGTH = 256
+_SHA256_HEX = re.compile(r"[0-9a-f]{64}")
+
+
+def hash_api_key(key):
+    """SHA-256 of an API key. Keys are long random strings, so a fast hash is enough."""
+    return hashlib.sha256(key.encode("utf-8")).hexdigest()
+
+
+def parse_api_key_hashes(value):
+    """Parse SHA-256 hex digests separated by commas or newlines, and fail fast on a typo."""
+    hashes = [h.strip().lower() for h in re.split(r"[,\s]+", value or "") if h.strip()]
+    for h in hashes:
+        if not _SHA256_HEX.fullmatch(h):
+            raise ValueError("API_KEY_HASHES must be comma-separated SHA-256 hex digests")
+    return hashes
 
 
 def is_internal_host(hostname):
@@ -74,11 +96,55 @@ class RateLimiter:
             return count <= self.limit, retry_after
 
 
-def create_app(db_path=None, rate_limit=None):
+def load_api_key_hashes_setting():
+    """Read key hashes from the file in API_KEY_HASHES_FILE (for example a mounted Kubernetes
+    Secret), or else from API_KEY_HASHES. A missing file means no keys: writes are refused."""
+    path = os.environ.get("API_KEY_HASHES_FILE")
+    if path:
+        try:
+            with open(path, encoding="utf-8") as f:
+                return f.read()
+        except FileNotFoundError:
+            return ""
+    return os.environ.get("API_KEY_HASHES", "")
+
+
+def create_app(db_path=None, rate_limit=None, api_key_hashes=None):
     app = Flask(__name__)
     app.config["DB_PATH"] = db_path or os.environ.get("DB_PATH", "/data/links.db")
     limit = rate_limit if rate_limit is not None else int(os.environ.get("RATE_LIMIT_PER_MINUTE", "30"))
     limiter = RateLimiter(limit=limit)
+    if api_key_hashes is None:
+        key_hashes = parse_api_key_hashes(load_api_key_hashes_setting())
+    else:
+        key_hashes = parse_api_key_hashes(",".join(api_key_hashes))
+
+    def has_valid_api_key():
+        scheme, _, token = request.headers.get("Authorization", "").partition(" ")
+        token = token.strip()
+        if scheme.lower() != "bearer" or not token or len(token) > MAX_API_KEY_LENGTH:
+            return False
+        digest = hash_api_key(token)
+        # Check every configured key so the time taken does not reveal which one matched.
+        matched = False
+        for expected in key_hashes:
+            matched |= hmac.compare_digest(digest, expected)
+        return matched
+
+    def rate_limited_or_unauthorized():
+        """Return an error response if the request is over the rate limit or has no valid key."""
+        allowed, retry_after = limiter.check(request.remote_addr or "unknown")
+        if not allowed:
+            resp = jsonify(error="rate limit exceeded, try again later")
+            resp.status_code = 429
+            resp.headers["Retry-After"] = str(retry_after)
+            return resp
+        if not has_valid_api_key():
+            resp = jsonify(error="a valid API key is required (Authorization: Bearer <key>)")
+            resp.status_code = 401
+            resp.headers["WWW-Authenticate"] = 'Bearer realm="links"'
+            return resp
+        return None
 
     def get_db():
         if "db" not in g:
@@ -113,12 +179,9 @@ def create_app(db_path=None, rate_limit=None):
 
     @app.post("/api/links")
     def create_link():
-        allowed, retry_after = limiter.check(request.remote_addr or "unknown")
-        if not allowed:
-            resp = jsonify(error="rate limit exceeded, try again later")
-            resp.status_code = 429
-            resp.headers["Retry-After"] = str(retry_after)
-            return resp
+        denied = rate_limited_or_unauthorized()
+        if denied is not None:
+            return denied
         data = request.get_json(silent=True)
         if not isinstance(data, dict):
             # Valid JSON that is not an object (a number, list, or string) used to crash here.
@@ -170,6 +233,9 @@ def create_app(db_path=None, rate_limit=None):
 
     @app.delete("/api/links/<code>")
     def delete_link(code):
+        denied = rate_limited_or_unauthorized()
+        if denied is not None:
+            return denied
         db = get_db()
         cur = db.execute("DELETE FROM links WHERE code = ?", (code,))
         db.commit()

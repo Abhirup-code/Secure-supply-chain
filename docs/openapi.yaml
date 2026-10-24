@@ -22,7 +22,9 @@ paths:
   /api/links:
     post:
       summary: Create a short link
-      description: Rate limited per client IP (default 30 per minute).
+      description: Needs an API key. Rate limited per client IP (default 30 per minute), including failed key attempts.
+      security:
+        - apiKey: []
       requestBody:
         required: true
         content:
@@ -43,6 +45,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Link" }
         "400": { description: Missing, too long, non-http(s), or internal URL }
+        "401": { description: Missing or invalid API key }
         "429": { description: Rate limit exceeded (see the Retry-After header) }
   /api/links/{code}:
     parameters:
@@ -58,8 +61,11 @@ paths:
         "404": { description: Unknown code }
     delete:
       summary: Delete a short link
+      security:
+        - apiKey: []
       responses:
         "204": { description: Deleted }
+        "401": { description: Missing or invalid API key }
         "404": { description: Unknown code }
   /{code}:
     parameters:
@@ -70,6 +76,11 @@ paths:
         "302": { description: Redirect to the stored URL }
         "404": { description: Unknown code }
 components:
+  securitySchemes:
+    apiKey:
+      type: http
+      scheme: bearer
+      description: An API key whose SHA-256 hash is listed in the server's API_KEY_HASHES.
   parameters:
     Code:
       name: code

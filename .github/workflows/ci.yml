@@ -51,7 +51,12 @@ jobs:
       - name: Build and smoke test
         run: |
           docker build -t secure-supply-chain:test .
+          # A throwaway API key for this run only; the container gets just its hash.
+          API_KEY="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
+          echo "::add-mask::${API_KEY}"
+          API_KEY_HASHES="$(printf '%s' "$API_KEY" | sha256sum | cut -d' ' -f1)"
           docker run -d --name smoke -p 8000:8000 --read-only --tmpfs /tmp \
+            -e API_KEY_HASHES="$API_KEY_HASHES" \
             --cap-drop ALL --security-opt no-new-privileges:true \
             -v ship-data:/data secure-supply-chain:test
           for _ in $(seq 1 20); do
@@ -60,7 +65,10 @@ jobs:
           done
           curl -sf http://localhost:8000/health
           # Save the response and read it with jq (no piping downloaded content into an interpreter)
-          curl -sf -X POST -H 'Content-Type: application/json' \
+          # Without a key, creating a link is refused
+          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' \
+            -d '{"url":"https://example.com"}' http://localhost:8000/api/links)" = "401"
+          curl -sf -X POST -H 'Content-Type: application/json' -H "Authorization: Bearer ${API_KEY}" \
             -d '{"url":"https://example.com"}' -o created.json http://localhost:8000/api/links
           code=$(jq -r .code created.json)
           test "$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:8000/${code}")" = "302"
@@ -159,10 +167,16 @@ jobs:
       - name: Build and start the hardened container
         run: |
           docker build -t secure-supply-chain:dast .
+          # Give ZAP a valid API key so it can test the protected endpoints too.
+          API_KEY="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
+          echo "::add-mask::${API_KEY}"
+          echo "ZAP_AUTH_HEADER_VALUE=Bearer ${API_KEY}" >> "$GITHUB_ENV"
+          API_KEY_HASHES="$(printf '%s' "$API_KEY" | sha256sum | cut -d' ' -f1)"
           # Rate limit raised so the scanner tests the app, not the limiter.
           docker run -d --name app -p 8000:8000 --read-only --tmpfs /tmp \
             --cap-drop ALL --security-opt no-new-privileges:true \
-            -e RATE_LIMIT_PER_MINUTE=1000000 -v dast-data:/data secure-supply-chain:dast
+            -e RATE_LIMIT_PER_MINUTE=1000000 -e API_KEY_HASHES="$API_KEY_HASHES" \
+            -v dast-data:/data secure-supply-chain:dast
           for _ in $(seq 1 30); do
             if curl -sf http://localhost:8000/health; then break; fi
             sleep 1
@@ -172,7 +186,8 @@ jobs:
           mkdir -p zap
           cp docs/openapi.yaml .zap/rules.tsv zap/
           chmod -R a+rwX zap
-          docker run --rm --network host -v "$PWD/zap:/zap/wrk:rw" ghcr.io/zaproxy/zaproxy:stable \
+          docker run --rm --network host -e ZAP_AUTH_HEADER_VALUE -e ZAP_AUTH_HEADER_SITE=localhost \
+            -v "$PWD/zap:/zap/wrk:rw" ghcr.io/zaproxy/zaproxy:stable \
             zap-api-scan.py -t openapi.yaml -f openapi -O http://localhost:8000 \
             -c rules.tsv -I -r zap-report.html -J zap-report.json
       - name: Upload ZAP report
