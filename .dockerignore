@@ -7,6 +7,8 @@ __pycache__
 .venv
 k8s
 scripts
+fuzz
+requirements-fuzz.*
 .zap
 .grype.yaml
 LICENSE
