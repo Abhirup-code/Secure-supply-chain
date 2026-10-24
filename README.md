@@ -97,7 +97,7 @@ With the `protect-main` ruleset on, changes reach `main` only through a pull req
 | Code | ruff security rules, bandit, CodeQL security-extended, zizmor for workflows |
 | Container | Multi-stage build, fixed non-root UID, read-only filesystem, all capabilities dropped, `no-new-privileges`, health check |
 | Releases | Version tags publish a signed image and a GitHub Release with the SBOM and verify commands; tags must point at a commit already on `main` |
-| App | http/https allowlist, blocks internal and private addresses, parameterized SQL, unguessable codes, per-IP rate limiting, CSP and security headers |
+| App | API keys for writes (only hashes stored, constant-time check, fail closed, rate limited), http/https allowlist, blocks internal and private addresses, parameterized SQL, unguessable codes, CSP and security headers |
 
 See [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) for the STRIDE threat model and [SECURITY.md](SECURITY.md) for how to verify an image yourself.
 
@@ -114,9 +114,15 @@ pip install --require-hashes -r requirements-fuzz.txt
 PYTHONPATH=. python fuzz/fuzz_links.py -max_total_time=60   # fuzz for a minute
 ```
 
+Creating and deleting links needs an API key. The server only ever sees the key's SHA-256 hash:
+
 ```bash
+export API_KEY="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
+export API_KEY_HASHES="$(printf '%s' "$API_KEY" | shasum -a 256 | cut -d' ' -f1)"
 docker compose up --build   # http://localhost:8000
-curl -X POST -H 'Content-Type: application/json' -d '{"url":"https://example.com"}' localhost:8000/api/links
+
+curl -X POST -H "Authorization: Bearer $API_KEY" -H 'Content-Type: application/json' \
+  -d '{"url":"https://example.com"}' localhost:8000/api/links
 ```
 
 Policy and manifest checks (Linux; downloads pinned, checksum-verified tools into `./bin`):
@@ -135,19 +141,23 @@ helm install kyverno kyverno/kyverno -n kyverno --create-namespace
 kubectl apply -k k8s/policies
 # 2. Deploy the app (the policies verify the image before it starts)
 kubectl apply -k k8s/app
+# 3. Allow an API key to create links (only its hash goes into the cluster)
+kubectl -n links create secret generic links-api-keys --from-literal=hashes="$API_KEY_HASHES"
 ```
 
 ## API
 
 Full spec: [docs/openapi.yaml](docs/openapi.yaml)
 
-| Method | Path | Description |
-|---|---|---|
-| POST | `/api/links` | Create a short link from `{"url": "https://..."}` (rate limited, default 30/minute per IP via `RATE_LIMIT_PER_MINUTE`) |
-| GET | `/{code}` | Redirect to the original URL (302) and count the hit |
-| GET | `/api/links/{code}` | Link details and hit count |
-| DELETE | `/api/links/{code}` | Delete a short link (204, or 404 if unknown) |
-| GET | `/health` | Health check |
+| Method | Path | API key | Description |
+|---|---|---|---|
+| POST | `/api/links` | Required | Create a short link from `{"url": "https://..."}` (rate limited, default 30/minute per IP via `RATE_LIMIT_PER_MINUTE`; failed key attempts count too) |
+| DELETE | `/api/links/{code}` | Required | Delete a short link (204, or 404 if unknown) |
+| GET | `/{code}` | No | Redirect to the original URL (302) and count the hit |
+| GET | `/api/links/{code}` | No | Link details and hit count |
+| GET | `/health` | No | Health check |
+
+Send the key as `Authorization: Bearer <key>`. The server is configured with SHA-256 hashes of the allowed keys, from `API_KEY_HASHES` (comma-separated) or a file named by `API_KEY_HASHES_FILE` (used for the Kubernetes Secret). With no keys configured, writes are refused.
 
 ## Releasing
 
