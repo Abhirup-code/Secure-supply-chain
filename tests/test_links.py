@@ -151,3 +151,60 @@ def test_rate_limit_is_per_client():
     assert limiter.check("1.1.1.1")[0] is True
     assert limiter.check("2.2.2.2")[0] is True
     assert limiter.check("1.1.1.1")[0] is False
+
+
+@pytest.mark.parametrize("body", ["1", "[]", '"https://example.com"', "null", "true", "{bad json", ""])
+def test_body_that_is_not_a_json_object_is_rejected(client, body):
+    # Regression test for a crash found by fuzzing (fuzz/fuzz_links.py)
+    r = client.post("/api/links", data=body, content_type="application/json")
+    assert r.status_code == 400
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://example.com\u2100",
+        "https://evil.com\uff03@bank.com",
+        "http://[::1",
+        "https://example.com:e/",
+        "https://example.com:99999/",
+    ],
+)
+def test_url_that_cannot_be_parsed_is_rejected(client, url):
+    # Regression test for a crash found by fuzzing (fuzz/fuzz_links.py)
+    assert create(client, url).status_code == 400
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://example.com/a\nSet-Cookie: x=1",
+        "https://example.com/a\r\nb",
+        "https://exa\tmple.com",
+        "https://example.com/\x00",
+        "https://example.com/\x7f",
+        "https://metadata.google.inter\nnal",
+    ],
+)
+def test_url_with_control_characters_is_rejected(client, url):
+    # Regression test for broken redirects / header injection found by fuzzing
+    assert create(client, url).status_code == 400
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://localhost\u3002",  # ideographic full stop
+        "http://\uff4c\uff4f\uff43\uff41\uff4c\uff48\uff4f\uff53\uff54",  # full-width "localhost"
+        "http://\uff11\uff12\uff17.0.0.1/",  # full-width digits for 127.0.0.1
+        "http://169.254.169.254\u3002/latest/meta-data",  # cloud metadata with a Unicode dot
+        "https://localhost\uffff",  # not a valid hostname at all
+    ],
+)
+def test_unicode_lookalike_internal_hosts_are_rejected(client, url):
+    # Regression test for an internal-address blocklist bypass found by fuzzing
+    assert create(client, url).status_code == 400
+
+
+def test_international_domain_names_still_work(client):
+    assert create(client, "https://b\u00fccher.example/").status_code == 201

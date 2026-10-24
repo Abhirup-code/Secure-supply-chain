@@ -119,16 +119,36 @@ def create_app(db_path=None, rate_limit=None):
             resp.status_code = 429
             resp.headers["Retry-After"] = str(retry_after)
             return resp
-        data = request.get_json(silent=True) or {}
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            # Valid JSON that is not an object (a number, list, or string) used to crash here.
+            # Found by the Atheris fuzz test.
+            return jsonify(error="request body must be a JSON object"), 400
         url = str(data.get("url", "")).strip()
         if not url:
             return jsonify(error="url is required"), 400
         if len(url) > MAX_URL_LENGTH:
             return jsonify(error="url too long"), 400
-        parsed = urlparse(url)
+        if any(ord(ch) < 0x20 or ord(ch) == 0x7F for ch in url):
+            # Control characters (newline, tab, NUL, ...) enable header injection and parser
+            # confusion, and broke the redirect for stored links. Found by the Atheris fuzz test.
+            return jsonify(error="url must not contain control characters"), 400
+        try:
+            parsed = urlparse(url)
+            # Check the hostname the way browsers and DNS will see it. IDNA normalization turns
+            # look-alikes such as "localhost。" (ideographic full stop), full-width "ｌｏｃａｌｈｏｓｔ",
+            # or "１２７.0.0.1" into their ASCII form, so they cannot slip past the internal-host
+            # check. Found by the Atheris fuzz test.
+            hostname = (parsed.hostname or "").encode("idna").decode("ascii")
+            _ = parsed.port  # raises for a port that is not a number from 0 to 65535
+        except ValueError:
+            # urlparse raises for hostnames with characters that normalize into URL syntax
+            # (for example "℀" becomes "a/c") and for bad ports; the IDNA codec raises for
+            # invalid hostnames.
+            return jsonify(error="invalid URL"), 400
         if parsed.scheme.lower() not in ALLOWED_SCHEMES or not parsed.netloc:
             return jsonify(error="only http and https URLs are allowed"), 400
-        if is_internal_host(parsed.hostname):
+        if is_internal_host(hostname):
             return jsonify(error="links to internal or private addresses are not allowed"), 400
         db = get_db()
         for _ in range(5):
