@@ -6,6 +6,8 @@ All notable changes to this project are listed here. The format follows
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-24
+
 ### Security
 - Creating and deleting links now requires an API key. Only SHA-256 hashes of the
   keys are configured, keys are compared in constant time, failed attempts count
@@ -42,6 +44,7 @@ All notable changes to this project are listed here. The format follows
 - Hardened Kubernetes manifests checked with kube-linter.
 - Release workflow that publishes signed images and a GitHub Release from version tags.
 
-[Unreleased]: https://github.com/Abhirup-code/Secure-supply-chain/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/Abhirup-code/Secure-supply-chain/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/Abhirup-code/Secure-supply-chain/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/Abhirup-code/Secure-supply-chain/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/Abhirup-code/Secure-supply-chain/releases/tag/v1.0.0
