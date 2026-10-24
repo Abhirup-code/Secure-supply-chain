@@ -59,8 +59,10 @@ jobs:
             sleep 1
           done
           curl -sf http://localhost:8000/health
-          code=$(curl -sf -X POST -H 'Content-Type: application/json' \
-            -d '{"url":"https://example.com"}' http://localhost:8000/api/links | python3 -c 'import sys,json;print(json.load(sys.stdin)["code"])')
+          # Save the response and read it with jq (no piping downloaded content into an interpreter)
+          curl -sf -X POST -H 'Content-Type: application/json' \
+            -d '{"url":"https://example.com"}' -o created.json http://localhost:8000/api/links
+          code=$(jq -r .code created.json)
           test "$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:8000/${code}")" = "302"
           test "$(docker exec smoke id -u)" != "0"
           docker rm -f smoke
