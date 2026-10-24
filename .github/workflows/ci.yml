@@ -121,6 +121,30 @@ jobs:
       - name: Test pod and registry policies (good and bad examples)
         run: bin/kyverno test k8s/policies/tests
 
+  fuzz:
+    name: Fuzz the link API (Atheris)
+    needs: lint-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+      - run: pip install --require-hashes -r requirements-fuzz.txt
+      - name: Fuzz for 5 minutes (fails on any crash or broken security rule)
+        run: |
+          mkdir -p fuzz-findings
+          PYTHONPATH=. python fuzz/fuzz_links.py -max_total_time=300 -artifact_prefix=fuzz-findings/
+      - name: Upload the input that broke a rule
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: fuzz-findings
+          path: fuzz-findings/
+
   dast:
     name: DAST (OWASP ZAP API scan)
     needs: lint-test
@@ -191,7 +215,7 @@ jobs:
   publish:
     name: Publish (main only)
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [image, policy, dast, admission]
+    needs: [image, policy, fuzz, dast, admission]
     permissions:
       contents: read
       packages: write     # push to GHCR

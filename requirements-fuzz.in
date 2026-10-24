@@ -1,0 +1,4 @@
+# Fuzzing tooling. Regenerate requirements-fuzz.txt after editing:
+#   uv pip compile requirements-fuzz.in --universal --python-version 3.14 --generate-hashes -o requirements-fuzz.txt
+-r requirements.in
+atheris==3.1.0

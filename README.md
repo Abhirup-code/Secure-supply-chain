@@ -17,7 +17,7 @@ flowchart TB
     PR[Pull request] --> CI
     subgraph CI [CI on every PR]
         direction TB
-        A[Lint, unit tests, bandit<br/>90% coverage gate]
+        A[Lint, unit tests, bandit<br/>90% coverage gate, fuzzing]
         B[Build image<br/>Trivy + Grype on the SBOM]
         C[OWASP ZAP<br/>scan of the running API]
         D[kube-linter + Kyverno<br/>policy tests]
@@ -54,6 +54,19 @@ The `Admission control in a real cluster` CI job starts a throwaway Kubernetes c
 
 The job writes this table to its run summary every time it runs. See [scripts/admission-test.sh](scripts/admission-test.sh).
 
+### Fuzzing found real bugs the unit tests missed
+
+The first runs of the Atheris fuzz test ([fuzz/fuzz_links.py](fuzz/fuzz_links.py)) found four bugs. Each one is fixed and has a regression test:
+
+| Input the fuzzer found | Problem | Fix |
+|---|---|---|
+| `http://localhost。`, full-width `ｌｏｃａｌｈｏｓｔ`, `１２７.0.0.1`, `169.254.169.254。` | **Blocklist bypass:** look-alike Unicode hostnames that browsers turn into internal addresses (including cloud metadata) were accepted | Check the IDNA-normalized hostname |
+| A URL with a newline or tab inside it | Stored links broke the redirect (a header-injection attempt) | Reject control characters |
+| A JSON body of `1` or `[]` | Server error (500) | Require a JSON object |
+| `http://example.com℀`, `https://example.com:e` | Server error (500) on parsing, or a stored link that could not be followed | Reject unparseable hosts and ports |
+
+After the fixes, an 8-minute run of over 500,000 inputs found nothing. CI fuzzes for 5 minutes on every pull request.
+
 ### A leaked key never becomes an image
 
 I tested my own pipeline by committing a fake AWS key. The secret scanner and the SAST lint both caught it, and the build stopped before an image was ever created.
@@ -76,6 +89,7 @@ With the `protect-main` ruleset on, changes reach `main` only through a pull req
 | Kubernetes manifests | Restricted Pod Security Standard on the namespace, default-deny NetworkPolicy, no service account token; kube-linter with all built-in checks |
 | Image integrity | cosign keyless signature, signed SBOM (syft, SPDX), SLSA build provenance (GitHub artifact attestations), all verified in CI before the image is trusted |
 | Vulnerabilities | Trivy (image and config) and Grype (on the SBOM) fail the build on fixable HIGH or CRITICAL issues; accepted risks need a written reason in [.grype.yaml](.grype.yaml) |
+| Fuzzing | Atheris (coverage-guided) runs 5 minutes on every PR, checking that the app never crashes and never stores an unsafe link |
 | Running app (DAST) | OWASP ZAP API scan of the live container from the [OpenAPI spec](docs/openapi.yaml); injection, XSS, and path traversal findings fail the build |
 | Workflow token | Default `contents: read`; write scopes only in the publish job |
 | Third-party code | Actions pinned to full commit SHAs; downloaded tools pinned and checksum-verified ([scripts/install-tools.sh](scripts/install-tools.sh)); Python dependencies pinned with hashes |
@@ -93,6 +107,11 @@ See [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) for the STRIDE threat model and
 pip install --require-hashes -r requirements-dev.txt
 pytest --cov=app
 ruff check . && bandit -c pyproject.toml -r app
+```
+
+```bash
+pip install --require-hashes -r requirements-fuzz.txt
+PYTHONPATH=. python fuzz/fuzz_links.py -max_total_time=60   # fuzz for a minute
 ```
 
 ```bash
