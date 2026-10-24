@@ -10,6 +10,10 @@ services:
     cap_drop: [ALL]            # drop all Linux capabilities
     security_opt:
       - no-new-privileges:true
+    environment:
+      # SHA-256 hashes of the API keys allowed to create and delete links (see README).
+      # Left empty, the app still serves links but refuses all writes.
+      API_KEY_HASHES: ${API_KEY_HASHES:-}
     restart: unless-stopped
 volumes:
   links-data:

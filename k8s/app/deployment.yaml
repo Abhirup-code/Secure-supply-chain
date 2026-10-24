@@ -42,6 +42,10 @@ spec:
           env:
             - name: DB_PATH
               value: /data/links.db
+            # Hashes of the API keys allowed to create and delete links, read from the
+            # mounted Secret. Without the Secret, the app serves links but refuses writes.
+            - name: API_KEY_HASHES_FILE
+              value: /etc/links/api-keys/hashes
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
@@ -70,7 +74,15 @@ spec:
               mountPath: /data
             - name: tmp
               mountPath: /tmp
+            - name: api-keys
+              mountPath: /etc/links/api-keys
+              readOnly: true
       volumes:
+        - name: api-keys
+          secret:
+            secretName: links-api-keys
+            optional: true
+            defaultMode: 0440
         - name: data
           emptyDir:
             sizeLimit: 100Mi

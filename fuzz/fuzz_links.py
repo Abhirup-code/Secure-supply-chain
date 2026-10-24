@@ -7,12 +7,14 @@ security rules hold for every input, not just the cases written in the unit test
 - a link is only stored if it is http(s), not too long, and not an internal address
 - following a stored link redirects to exactly the stored URL
 - arbitrary short codes never crash the lookup
+- no random Authorization header is ever accepted as an API key
 
 Run from the repository root: PYTHONPATH=. python fuzz/fuzz_links.py -max_total_time=60
 """
 
 import json
 import os
+import secrets
 import sys
 import tempfile
 from urllib.parse import urlparse
@@ -21,12 +23,16 @@ import atheris
 from werkzeug.urls import iri_to_uri
 
 with atheris.instrument_imports():
-    from app.main import ALLOWED_SCHEMES, MAX_URL_LENGTH, create_app, is_internal_host
+    from app.main import ALLOWED_SCHEMES, MAX_URL_LENGTH, create_app, hash_api_key, is_internal_host
 
 _db_dir = tempfile.mkdtemp(prefix="fuzz-links-")
-APP = create_app(db_path=os.path.join(_db_dir, "fuzz.db"), rate_limit=10**9)
+FUZZ_API_KEY = secrets.token_urlsafe(32)  # generated per run, never stored
+APP = create_app(
+    db_path=os.path.join(_db_dir, "fuzz.db"), rate_limit=10**9, api_key_hashes=[hash_api_key(FUZZ_API_KEY)]
+)
 APP.config["TESTING"] = True
 CLIENT = APP.test_client()
+CLIENT.environ_base["HTTP_AUTHORIZATION"] = f"Bearer {FUZZ_API_KEY}"
 
 # Building blocks that steer the fuzzer toward interesting URLs quickly.
 SCHEMES = ["http", "https", "HTTP", "javascript", "data", "file", "ftp", "", "hTtPs"]
@@ -70,7 +76,7 @@ def check_create(url):
 
 def test_one_input(data):
     fdp = atheris.FuzzedDataProvider(data)
-    choice = fdp.ConsumeIntInRange(0, 3)
+    choice = fdp.ConsumeIntInRange(0, 4)
     if choice == 0:
         # Structured URL built from risky parts plus fuzzed path
         url = (
@@ -92,6 +98,18 @@ def test_one_input(data):
             parsed = None
         if resp.status_code == 201:
             assert isinstance(parsed, dict), "accepted a body that is not a JSON object"
+    elif choice == 3:
+        # Random Authorization headers must never authenticate
+        header = fdp.ConsumeUnicodeNoSurrogates(300)
+        if header == f"Bearer {FUZZ_API_KEY}" or "\n" in header or "\r" in header:
+            return
+        try:
+            resp = CLIENT.post(
+                "/api/links", json={"url": "https://example.com"}, headers={"Authorization": header}
+            )
+        except ValueError:
+            return  # the test client refuses header values that are not valid HTTP
+        assert resp.status_code == 401, f"header {header!r} returned {resp.status_code}"
     else:
         # Arbitrary short codes for lookup, stats, and delete
         code = fdp.ConsumeUnicodeNoSurrogates(64).replace("/", "")
