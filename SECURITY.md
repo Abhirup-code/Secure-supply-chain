@@ -1,9 +1,22 @@
 # Security Policy
 
+## Supported versions
+
+Only the latest release gets security fixes. Fixes ship as a new release, so upgrade to it.
+
+| Version | Supported | Notes |
+|---|---|---|
+| 1.2.x | Yes | Current release |
+| 1.1.x | No | Upgrade to 1.2.x |
+| 1.0.x | No | Affected by the Unicode hostname blocklist bypass fixed in 1.1.0 |
+
 ## Reporting a vulnerability
 
 Please do not open a public issue. Use the **Report a vulnerability** button under this
 repository's Security tab (private vulnerability reporting).
+
+I aim to acknowledge reports within 3 days and to release a fix for confirmed issues
+within 14 days, then credit the reporter in the release notes (unless they prefer not).
 
 ## Verifying a published image
 
