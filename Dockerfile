@@ -1,5 +1,5 @@
 # ---- build stage: install pinned dependencies into a virtualenv ----
-FROM python:3.14-slim@sha256:0514bc76712d64f8bb48adcb95b1ab0d88c69fee95d62fe4c18ee948bee9b1e1 AS build
+FROM python:3.15-slim@sha256:65a65fc7b30b06cb6df4930fd4650697cb23f4c2698ab81fc87e4b031bc36928 AS build
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1 PIP_NO_CACHE_DIR=1
 RUN python -m venv /venv
 COPY requirements.txt .
@@ -7,7 +7,7 @@ RUN /venv/bin/pip install --require-hashes -r requirements.txt \
     && /venv/bin/pip uninstall -y pip   # no package manager left in the app venv
 
 # ---- runtime stage: only the app and its venv, no build tools ----
-FROM python:3.14-slim@sha256:0514bc76712d64f8bb48adcb95b1ab0d88c69fee95d62fe4c18ee948bee9b1e1
+FROM python:3.15-slim@sha256:65a65fc7b30b06cb6df4930fd4650697cb23f4c2698ab81fc87e4b031bc36928
 # Apply the latest OS security patches and remove pip/setuptools, which the app never uses at runtime
 RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
 RUN python -m pip uninstall -y pip setuptools wheel || true
